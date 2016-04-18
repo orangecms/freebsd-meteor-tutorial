@@ -104,7 +104,7 @@ tar -xf /home/freebsd/my_app.tar.gz            # extract
 cd bundle/programs/server; npm i; cd ../../../ # install node modules
 ```
 
-From here on, the app could already be run by simply invoking `node my_app/main.js`. This way you can now confirm everything was installed correctly - at least on the server side.
+From here on, the app could already be run by simply invoking `node bundle/main.js`. This way you can now confirm everything was installed correctly - at least on the server side.
 
 ### Running as a system service
 
