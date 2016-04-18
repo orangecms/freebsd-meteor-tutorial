@@ -1,14 +1,19 @@
+## About
+This is a tutorial on running Meteor applications on FreeBSD servers, e.g. [droplets on DigitalOcean](https://www.digitalocean.com/company/blog/presenting-freebsd-how-we-made-it-happen/). If they accept it, DigitalOcean might publish this article in their tutorials area as well. But first of all I want it to be available to people, regardless of the hosting platform, so kudos to GitHub for simply allowing this. :)
+
 ## Introduction
 
 Meteor works with legacy Node.js (v0.10.x). The pkg repository, however, offers the latest version.
 
-### Research
-Let's consult Google. We end up in (https://forums.freebsd.org/threads/52004/)[the FreeBSD forums].
+## Prerequisites on the server
 
-So there is (http://www.freshports.org/www/npm)[a port for npm] (a description how to build a package).
+### Research
+Let's consult Google. We end up in [the FreeBSD forums](https://forums.freebsd.org/threads/52004/).
+
+So there is [a port for npm](http://www.freshports.org/www/npm) (a description how to build a package).
 
 ### Preparation
-First things first. We need to upgrade the ports tree, so let's (https://www.freebsd.org/doc/handbook/ports-using.html)[RTFM] how to do that again.
+First things first. We need to upgrade the ports tree, so let's [RTFM](https://www.freebsd.org/doc/handbook/ports-using.html) how to do that again.
 
 Assuming we already had a tree:
 ```bash
@@ -21,7 +26,7 @@ First cd to the npm port:
 cd /usr/ports/www/npm
 ```
 
-And then use `NODE010` as mentioned in the forum. (https://www.freebsd.org/cgi/man.cgi?ports(7))[The man page says] `config` lets us change the OPTIONS. When running
+And then use `NODE010` as mentioned in the forum. [The man page says](https://www.freebsd.org/cgi/man.cgi?ports(7)) `config` lets us change the OPTIONS. When running
 ```bash
 make config
 ```
@@ -73,4 +78,62 @@ cd /usr/ports/www/npm
 make config
 pkg remove node npm
 make && make install
+```
+
+## Build & Deploy
+
+### Create a tarball
+In the project directory where you usually run `meteor`, run:
+```bash
+meteor build .
+```
+
+This will create a `.tar.gz` file, usually named `my_app.tar.gz`.
+
+### Upload the app to the server
+```bash
+ssh-add ~/.ssh/my-ssh-key-to-my-server
+sftp freebsd@my-domain.org
+put my_app.tar.gz
+```
+
+### Deploy the app
+```bash
+ssh freebsd@my-domain.org
+tar -xf /home/freebsd/my_app.tar.gz            # extract
+cd bundle/programs/server; npm i; cd ../../../ # install node modules
+```
+
+From here on, the app could already be run by simply invoking `node my_app/main.js`. This way you can now confirm everything was installed correctly - at least on the server side.
+
+### Running as a system service
+
+#### Preparation
+As a first step, move the app to the global web server directory:
+```bash
+sudo chown -R root:wheel bundle                # fix permissions
+sudo mv bundle /usr/local/www/my_app           # move to web server home
+```
+
+Then create directories where log and pid files will be stored. Log files will help you understand what happened when errors occur or something just didn't work, and the pid files are necessary for the service.
+```
+sudo mkdir -p /var/log/node /var/run/node      # create dirs for log and pid files
+```
+
+#### Creating a service
+##### Init script
+[FreeBSD rc scripts](https://www.freebsd.org/doc/en/articles/rc-scripting/) reside in `/usr/local/etc/rc.d/`. This is where we will create our scripts as well.
+```bash
+cd /usr/local/etc/rc.d/
+```
+
+##### Configuration
+Write the environment variables (env vars) into `/etc/rc.conf.d/my_app`:
+
+```bash
+my_app_enable=YES                                        # enable for auto-run on server startup and service start instead of onestart
+NODE_ENV=production                                      # this is our production environment, check out the Node.js docs for more
+PORT=3123                                                # make sure to use one port per app, and remember it for the reverse proxy
+ROOT_URL=https://my-domain.org/my_app                    # the root URL as seen from outside, used by Meteor.absoluteUrl
+MONGO_URL=mongodb://meteor:meteor@127.0.0.1:27017/my_app # find another tutorial if you need to set up MongoDB ;)
 ```
