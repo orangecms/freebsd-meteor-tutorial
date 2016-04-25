@@ -106,6 +106,10 @@ cd bundle/programs/server; npm i; cd ../../../ # install node modules
 
 From here on, the app could already be run by simply invoking `node bundle/main.js`. This way you can now confirm everything was installed correctly - at least on the server side.
 
+### Configuring reverse proxy (nginx)
+
+#### TODO:
+
 ### Running as a system service
 
 #### Preparation
@@ -126,6 +130,10 @@ sudo mkdir -p /var/log/node /var/run/node      # create dirs for log and pid fil
 ```bash
 cd /usr/local/etc/rc.d/
 ```
+
+With this tutorial comes a file `my_app` which can be used as a skeleton.
+
+Hint: App names should not contain `-` because that would breake the name of the variable in the script. This is why I chose `my_app` in this case. Otherwise you will need to work around this and adjust the skeleton accordingly.
 
 ##### Configuration
 Write the environment variables (env vars) into `/etc/rc.conf.d/my_app`:
