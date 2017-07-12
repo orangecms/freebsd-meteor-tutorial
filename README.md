@@ -4,97 +4,52 @@ This is a tutorial on running Meteor applications on FreeBSD servers, e.g.
 
 ## Introduction
 Current Meteor apps (v1.4.x, v1.5.x) can be run with Node.js v6.x. The pkg
-repository, however, offers the latest version (as of writing this, v8.1.3).
+repository offers multiple versions. This tutorial will explain how to install
+Node 6 to get your app to run.
 
-This means, to deploy a Meteor-based app on FreeBSD, you will need to build
-the specific versions of Node.js and npm from the ports tree.
+### Disclaimer / warning
+As of writing this, Node.js just published
+[a security report](https://nodejs.org/en/blog/vulnerability/july-2017-security-releases/).
+This may happen again later. Make sure to be running a stable and patched
+version on your production servers.
 
 ## Prerequisites on the server
-
-### Research
-Let's consult Google. We end up in
-[the FreeBSD forums](https://forums.freebsd.org/threads/52004/).
-
-So there is [a port for npm3](http://www.freshports.org/www/npm3)
-(a description how to build a package).
-
-### Preparation
-First things first. We need to upgrade the ports tree, so let's
-[RTFM](https://www.freebsd.org/doc/handbook/ports-using.html) how to do that
-again.
-
-Assuming we already had a tree:
+### Install Node 6 and npm 3
+As of writing this, the current stable version of Node is 8.1.3. However, Meteor
+apps require at maximum Node 6 (the current LTS version) in order to build some
+native modules, including `fibers`. So you will need to install the specific
+versions:
 ```bash
-portsnap fetch update
+pkg install node6 npm3
 ```
 
-### Configuration
-First cd to the npm3 port:
+### Potential issues
+In case you already hat the latest stable version of Node installed, pkg will
+tell you about the conflict and offer to replace it, for example:
 ```bash
-cd /usr/ports/www/npm3
+The following 3 package(s) will be affected (of 0 checked):
+
+Installed packages to be REMOVED:
+	node-8.1.3
+
+New packages to be INSTALLED:
+	node6: 6.11.0
+	npm3: 3.10.10_2
+
+Number of packages to be removed: 1
+Number of packages to be installed: 2
+
+The process will require 7 MiB more space.
+
+Proceed with this action? [y/N]:
 ```
 
-And then use `NODE6`.
-[The man page says](https://www.freebsd.org/cgi/man.cgi?ports(7)) `config` lets
-us change the OPTIONS. When running
-```bash
-make config
-```
-, we get a simple ncurses menu. Choose `NODE6` by navigating with the arrow keys
-and pressing space to select, then Return.
+FreeBSD currently does not allow for multiple versions of Node to be installed
+in parallel like you may know it from Python. Make sure that you have no other
+apps installed that would require a more recent version of Node so they will not
+break. Then you can enter `y` to continue.
 
-*Note*: This requires interaction. On a CI server, I wouldn't want that, but
-couldn't figure out how to do this non-interactively. PRs are welcome!
-
-To make sure we got it right:
-```bash
-make showconfig
-```
-The output should contain the following line:
-```bash
-NODE6=on: Use www/node6 as backend
-```
-
-### Installation
-Now as usual:
-```bash
-make && make install
-```
-
-Oh wait, that doesn't work if we already have npm installed, e.g.:
-```bash
-===>  Checking if npm already installed
-===>   npm-3.8.6 is already installed
-      You may wish to ``make deinstall'' and install this port again
-      by ``make reinstall'' to upgrade it properly.
-```
-
-If installed through pkg, simply remove it through it, together with Node.js:
-```bash
-pkg remove node npm
-```
-
-And try again:
-```bash
-make install
-```
-
-Now this builds Node.js version 6 and installs it as well. :)
-
-### Summary
-The whole procedure boils down to these few commands:
-
-```bash
-portsnap fetch update
-cd /usr/ports/www/npm3
-make config
-# choose NODE6
-pkg remove node npm
-make && make install
-```
-
-## Build & Deploy
-
+## Deploying the application
 ### Create a tarball
 In the project directory where you usually run `meteor`, run:
 ```bash
@@ -104,18 +59,23 @@ meteor build .      # to create the Meteor app bundle
 
 This will create a file named `src.tar.gz` in the current directory.
 
-### Upload the app to the server
+### Upload the tarball to the server
 ```bash
 ssh-add ~/.ssh/my-ssh-key-to-my-server
 sftp freebsd@my-domain.org
 put src.tar.gz
 ```
 
-### Deploy the app
+### Extract the tarball and install application dependencies
 ```bash
 ssh freebsd@my-domain.org
-tar -xf /home/freebsd/src.tar.g   z            # extract
-cd bundle/programs/server; npm i; cd ../../../ # install node modules
+tar -xf /home/freebsd/src.tar.gz             # extract
+(cd bundle/programs/server && npm install)   # install node modules
+```
+The `README` in `bundle/` holds brief information on the procedure. You might
+wish to look into it:
+```bash
+cat bundle/README
 ```
 
 From here on, the app could already be run by simply invoking:
@@ -124,7 +84,9 @@ node bundle/main.js
 ```
 This will give you an error that certain environment variables are not set, but
 this way you can now confirm everything was installed correctly and your
-application can be run - at least on the server side.
+application can be run - at least on the server side. The gist about the
+environment variables is found in the aforementioned README file. For details,
+please read the official Meteor documentation.
 
 ### Configuring reverse proxy (nginx)
 
@@ -138,8 +100,8 @@ personal preference to keep web-based apps in one place, but you can put it
 anywhere else as you wish. You would just need to adjust the path in the rc
 script.
 ```bash
-sudo chown -R root:wheel bundle                # fix permissions
-sudo mv bundle /usr/local/www/my_app           # move to web server home
+sudo chown -R www:www bundle                 # set file permissions
+sudo mv bundle /usr/local/www/my_app         # move to web server home
 ```
 
 Then create directories where log and pid files will be stored. Log files will
